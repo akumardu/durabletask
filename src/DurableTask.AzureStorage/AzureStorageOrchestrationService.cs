@@ -620,15 +620,16 @@ namespace DurableTask.AzureStorage
 
             bool isNewSession = false;
             OrchestrationSession session;
-            if (!this.activeOrchestrationSessions.TryGetValue(instance.InstanceId, out session))
+            if (!this.activeOrchestrationSessions.TryGetValue(instance.InstanceId, out session) || session == null)
             {
                 // This is a newly activated orchestration instance session.
                 session = new OrchestrationSession(
                     this.storageAccountName,
                     this.settings.TaskHubName,
                     instance,
-                    idleTimeout: TimeSpan.FromSeconds(30));
-                this.activeOrchestrationSessions.TryAdd(instance.InstanceId, session);
+                    idleTimeout: this.settings.ExtendedSessionIdleTimeout);
+
+                this.activeOrchestrationSessions[instance.InstanceId] = session;
                 isNewSession = true;
             }
 
@@ -639,9 +640,10 @@ namespace DurableTask.AzureStorage
                 return null;
             }
 
-            if (!isNewSession)
+            if (!isNewSession && this.settings.ExtendedSessionsEnabled)
             {
-                // Only new sessions should be returned to the main dispatch loop.
+                // Only work items for new sessions should be returned to the main dispatch loop.
+                // Work items for extentended sessions must not be returned.
                 return null;
             }
 
@@ -743,13 +745,20 @@ namespace DurableTask.AzureStorage
                 }
 
                 // Pull batches of messages off the linked-list in FIFO order to ensure fairness.
+                // Skip over instances which are currently being processed unless extended sessions are enabled.
                 node = this.pendingOrchestrationMessageBatches.First;
-                if (node != null)
+                while (node != null)
                 {
                     PendingMessageBatch nextBatch = node.Value;
-                    this.pendingOrchestrationMessageBatches.Remove(node);
-                    this.stats.PendingOrchestratorMessages.Increment(-nextBatch.Messages.Count);
-                    return nextBatch;
+                    if (this.settings.ExtendedSessionsEnabled ||
+                        this.activeOrchestrationSessions.TryAdd(nextBatch.OrchestrationInstanceId, null))
+                    {
+                        this.pendingOrchestrationMessageBatches.Remove(node);
+                        this.stats.PendingOrchestratorMessages.Increment(-nextBatch.Messages.Count);
+                        return nextBatch;
+                    }
+
+                    node = node.Next;
                 }
 
                 return null;
@@ -1503,7 +1512,8 @@ namespace DurableTask.AzureStorage
                 OrchestrationState state = await this.GetOrchestrationStateAsync(instanceId, executionId);
                 if (state == null || 
                     state.OrchestrationStatus == OrchestrationStatus.Running ||
-                    state.OrchestrationStatus == OrchestrationStatus.Pending)
+                    state.OrchestrationStatus == OrchestrationStatus.Pending ||
+                    state.OrchestrationStatus == OrchestrationStatus.ContinuedAsNew)
                 {
                     await Task.Delay(statusPollingInterval, cancellationToken);
                     timeout -= statusPollingInterval;

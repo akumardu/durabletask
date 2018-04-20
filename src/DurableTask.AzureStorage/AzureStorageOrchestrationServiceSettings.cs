@@ -102,6 +102,11 @@ namespace DurableTask.AzureStorage
         public bool ExtendedSessionsEnabled { get; set; }
 
         /// <summary>
+        /// Gets or sets the number of seconds before an idle session times out.
+        /// </summary>
+        public TimeSpan ExtendedSessionIdleTimeout { get; set; } = TimeSpan.FromSeconds(30);
+
+        /// <summary>
         /// Renew interval for all leases for partitions currently held.
         /// </summary>
         public TimeSpan LeaseRenewInterval { get; set; } = TimeSpan.FromSeconds(10);

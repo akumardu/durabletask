@@ -158,7 +158,7 @@ namespace DurableTask.AzureStorage.Tests
 
                 // Need to wait for the instance to start before sending events to it.
                 // TODO: This requirement may not be ideal and should be revisited.
-                await client.WaitForStartupAsync(TimeSpan.FromSeconds(10));
+                await client.WaitForStartupAsync(Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(10));
 
                 // Perform some operations
                 await client.RaiseEventAsync("operation", "incr");
@@ -185,7 +185,7 @@ namespace DurableTask.AzureStorage.Tests
                 // The end message will cause the actor to complete itself.
                 await client.RaiseEventAsync("operation", "end");
 
-                status = await client.WaitForCompletionAsync(TimeSpan.FromSeconds(10));
+                status = await client.WaitForCompletionAsync(Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(10));
 
                 Assert.AreEqual(OrchestrationStatus.Completed, status?.OrchestrationStatus);
                 Assert.AreEqual(3, JToken.Parse(status?.Output));
