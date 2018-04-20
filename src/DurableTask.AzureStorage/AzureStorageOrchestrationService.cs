@@ -126,7 +126,7 @@ namespace DurableTask.AzureStorage
 
             if (customInstanceStore == null)
             {
-                this.trackingStore = new AzureTableTrackingStore(settings.TaskHubName, settings.StorageConnectionString, this.messageManager, settings.HistoryTableRequestOptions, this.stats);
+                this.trackingStore = new AzureTableTrackingStore(settings, this.messageManager, this.stats);
             }
             else
             {
@@ -654,10 +654,18 @@ namespace DurableTask.AzureStorage
             var orchestrationWorkItem = new TaskOrchestrationWorkItem
             {
                 InstanceId = instance.InstanceId,
-                Session = session,
                 OrchestrationRuntimeState = runtimeState,
                 LockedUntilUtc = session.GetNextMessageExpirationTimeUtc(),
             };
+
+            if (this.settings.ExtendedSessionsEnabled)
+            {
+                orchestrationWorkItem.Session = session;
+            }
+            else
+            {
+                orchestrationWorkItem.NewMessages = session.CurrentMessageBatch.Select(m => m.TaskMessage).ToList();
+            }
 
             if (runtimeState.ExecutionStartedEvent != null &&
                 runtimeState.OrchestrationStatus != OrchestrationStatus.Running &&
@@ -766,13 +774,17 @@ namespace DurableTask.AzureStorage
             TaskMessage continuedAsNewMessage,
             OrchestrationState orchestrationState)
         {
-            OrchestrationSession session = (OrchestrationSession)workItem.Session;
-            if (session.IsReleased)
+            OrchestrationSession session;
+            if (!this.activeOrchestrationSessions.TryGetValue(workItem.InstanceId, out session))
             {
-                // Possible duplicate message
+                AnalyticsEventSource.Log.AssertFailure(
+                    this.storageAccountName,
+                    this.settings.TaskHubName,
+                    $"{nameof(CompleteTaskOrchestrationWorkItemAsync)}: Session for instance {workItem.InstanceId} was not found!");
                 return;
             }
 
+            session.StartNewLogicalTraceScope();
             OrchestrationRuntimeState runtimeState = workItem.OrchestrationRuntimeState;
 
             string instanceId = workItem.InstanceId;
@@ -955,13 +967,17 @@ namespace DurableTask.AzureStorage
         /// <inheritdoc />
         public async Task RenewTaskOrchestrationWorkItemLockAsync(TaskOrchestrationWorkItem workItem)
         {
-            OrchestrationSession session = (OrchestrationSession)workItem.Session;
-            if (session.IsReleased)
+            OrchestrationSession session;
+            if (!this.activeOrchestrationSessions.TryGetValue(workItem.InstanceId, out session))
             {
-                // Possible duplicate message
+                AnalyticsEventSource.Log.AssertFailure(
+                    this.storageAccountName,
+                    this.settings.TaskHubName,
+                    $"{nameof(RenewTaskOrchestrationWorkItemLockAsync)}: Session for instance {workItem.InstanceId} was not found!");
                 return;
             }
 
+            session.StartNewLogicalTraceScope();
             string instanceId = workItem.InstanceId;
             CloudQueue controlQueue = await this.GetControlQueueAsync(instanceId);
 
@@ -992,13 +1008,17 @@ namespace DurableTask.AzureStorage
         /// <inheritdoc />
         public async Task AbandonTaskOrchestrationWorkItemAsync(TaskOrchestrationWorkItem workItem)
         {
-            OrchestrationSession session = (OrchestrationSession)workItem.Session;
-            if (session.IsReleased)
+            OrchestrationSession session;
+            if (!this.activeOrchestrationSessions.TryGetValue(workItem.InstanceId, out session))
             {
-                // Possible duplicate message
+                AnalyticsEventSource.Log.AssertFailure(
+                    this.storageAccountName,
+                    this.settings.TaskHubName,
+                    $"{nameof(AbandonTaskOrchestrationWorkItemAsync)}: Session for instance {workItem.InstanceId} was not found!");
                 return;
             }
 
+            session.StartNewLogicalTraceScope();
             string instanceId = workItem.InstanceId;
             CloudQueue controlQueue = await this.GetControlQueueAsync(instanceId);
 
@@ -1050,6 +1070,13 @@ namespace DurableTask.AzureStorage
             if (this.activeOrchestrationSessions.TryRemove(workItem.InstanceId, out OrchestrationSession activeSession))
             {
                 activeSession.Dispose();
+            }
+            else
+            {
+                AnalyticsEventSource.Log.AssertFailure(
+                    this.storageAccountName,
+                    this.settings.TaskHubName,
+                    $"{nameof(ReleaseTaskOrchestrationWorkItemAsync)}: Session for instance {workItem.InstanceId} was not found!");
             }
 
             return Utils.CompletedTask;
@@ -1133,6 +1160,7 @@ namespace DurableTask.AzureStorage
                 return;
             }
 
+            session.StartNewLogicalTraceScope();
             string instanceId = workItem.TaskMessage.OrchestrationInstance.InstanceId;
             CloudQueue controlQueue = await this.GetControlQueueAsync(instanceId);
 
@@ -1200,6 +1228,7 @@ namespace DurableTask.AzureStorage
                 return ExpireWorkItem(workItem);
             }
 
+            session.StartNewLogicalTraceScope();
             string messageId = session.MessageData.OriginalQueueMessage.Id;
             string instanceId = workItem.TaskMessage.OrchestrationInstance.InstanceId;
 
@@ -1246,6 +1275,7 @@ namespace DurableTask.AzureStorage
                 return;
             }
 
+            session.StartNewLogicalTraceScope();
             string messageId = session.MessageData.OriginalQueueMessage.Id;
             string instanceId = workItem.TaskMessage.OrchestrationInstance.InstanceId;
 

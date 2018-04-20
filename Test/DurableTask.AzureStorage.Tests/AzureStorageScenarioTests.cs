@@ -100,6 +100,28 @@ namespace DurableTask.AzureStorage.Tests
         }
 
         /// <summary>
+        /// End-to-end test which validates function chaining by implementing a naive factorial function orchestration.
+        /// </summary>
+        [TestMethod]
+        public async Task SequentialOrchestrationNoReplay()
+        {
+            // Enable extended sesisons to ensure that the orchestration never gets replayed
+            using (TestOrchestrationHost host = TestHelpers.GetTestOrchestrationHost(enableExtendedSessions: true))
+            {
+                await host.StartAsync();
+
+                var client = await host.StartOrchestrationAsync(typeof(Orchestrations.FactorialNoReplay), 10);
+                var status = await client.WaitForCompletionAsync(
+                    Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(30));
+
+                Assert.AreEqual(OrchestrationStatus.Completed, status?.OrchestrationStatus);
+                Assert.AreEqual(10, JToken.Parse(status?.Input));
+                Assert.AreEqual(3628800, JToken.Parse(status?.Output));
+
+                await host.StopAsync();
+            }
+        }
+        /// <summary>
         /// End-to-end test which validates parallel function execution by enumerating all files in the current directory 
         /// in parallel and getting the sum total of all file sizes.
         /// </summary>
@@ -689,6 +711,20 @@ namespace DurableTask.AzureStorage.Tests
                     }
 
                     return result;
+                }
+            }
+
+            [KnownType(typeof(Activities.Multiply))]
+            internal class FactorialNoReplay : Factorial
+            {
+                public override Task<long> RunTask(OrchestrationContext context, int n)
+                {
+                    if (context.IsReplaying)
+                    {
+                        throw new Exception("Replaying is forbidden in this test.");
+                    }
+
+                    return base.RunTask(context, n);
                 }
             }
 

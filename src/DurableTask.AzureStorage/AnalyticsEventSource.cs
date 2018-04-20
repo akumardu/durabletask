@@ -148,10 +148,10 @@ namespace DurableTask.AzureStorage
         }
 
         [Event(110, Level = EventLevel.Informational)]
-        public void FetchedInstanceState(string Account, string TaskHub, string InstanceId, string ExecutionId, int EventCount, int RequestCount, long LatencyMs)
+        public void FetchedInstanceState(string Account, string TaskHub, string InstanceId, string ExecutionId, int EventCount, int RequestCount, long LatencyMs, bool ExtendedSessionsEnabled)
         {
             EnsureLogicalTraceActivityId();
-            this.WriteEvent(110, Account, TaskHub, InstanceId, ExecutionId, EventCount, RequestCount, LatencyMs);
+            this.WriteEvent(110, Account, TaskHub, InstanceId, ExecutionId, EventCount, RequestCount, LatencyMs, ExtendedSessionsEnabled);
         }
 
         [Event(111, Level = EventLevel.Informational)]

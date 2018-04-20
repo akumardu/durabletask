@@ -34,36 +34,34 @@ namespace DurableTask.AzureStorage.Tracking
     /// </summary>
     class AzureTableTrackingStore : TrackingStoreBase
     {
-
-        readonly string storageAccountName;
-        readonly string taskHubName;
-
-        readonly CloudTable historyTable;
-
-        readonly CloudTable instancesTable;
-
-        readonly AzureStorageOrchestrationServiceStats stats;
-
-        readonly TableEntityConverter tableEntityConverter;
-
-        readonly IReadOnlyDictionary<EventType, Type> eventTypeMap;
-
         const string InputProperty = "Input";
         const string ResultProperty = "Result";
         const string OutputProperty = "Output";
         const string BlobNamePropertySuffix = "BlobName";
         const int MaxStorageQueuePayloadSizeInBytes = 60 * 1024; // 60KB
 
+        readonly string storageAccountName;
+        readonly string taskHubName;
+        readonly AzureStorageOrchestrationServiceSettings settings;
+        readonly CloudTable historyTable;
+        readonly CloudTable instancesTable;
+        readonly AzureStorageOrchestrationServiceStats stats;
+        readonly TableEntityConverter tableEntityConverter;
+        readonly IReadOnlyDictionary<EventType, Type> eventTypeMap;
         readonly MessageManager messageManager;
 
-        public AzureTableTrackingStore(string taskHubName, string storageConnectionString, MessageManager messageManager, TableRequestOptions storageTableRequestOptions, AzureStorageOrchestrationServiceStats stats)
+        public AzureTableTrackingStore(
+            AzureStorageOrchestrationServiceSettings settings,
+            MessageManager messageManager,
+            AzureStorageOrchestrationServiceStats stats)
         {
+            this.settings = settings;
             this.messageManager = messageManager;
             this.stats = stats;
             this.tableEntityConverter = new TableEntityConverter();
-            this.taskHubName = taskHubName;
+            this.taskHubName = settings.TaskHubName;
 
-            CloudStorageAccount account = CloudStorageAccount.Parse(storageConnectionString);
+            CloudStorageAccount account = CloudStorageAccount.Parse(settings.StorageConnectionString);
             this.storageAccountName = account.Credentials.AccountName;
 
             CloudTableClient tableClient = account.CreateCloudTableClient();
@@ -76,10 +74,9 @@ namespace DurableTask.AzureStorage.Tracking
             NameValidator.ValidateTableName(instancesTableName);
 
             this.historyTable = tableClient.GetTableReference(historyTableName);
-
             this.instancesTable = tableClient.GetTableReference(instancesTableName);
 
-            this.StorageTableRequestOptions = storageTableRequestOptions;
+            this.StorageTableRequestOptions = settings.HistoryTableRequestOptions;
 
             // Use reflection to learn all the different event types supported by DTFx.
             // This could have been hardcoded, but I generally try to avoid hardcoding of point-in-time DTFx knowledge.
@@ -231,7 +228,8 @@ namespace DurableTask.AzureStorage.Tracking
                 executionId,
                 historyEvents.Count,
                 requestCount,
-                stopwatch.ElapsedMilliseconds);
+                stopwatch.ElapsedMilliseconds,
+                this.settings.ExtendedSessionsEnabled);
 
             return historyEvents;
         }

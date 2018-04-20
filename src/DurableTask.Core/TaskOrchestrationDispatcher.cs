@@ -98,11 +98,6 @@ namespace DurableTask.Core
         public bool IncludeParameters { get; set; }
 
         /// <summary>
-        /// Gets or sets a flag indicating whether to enable extended sessions.
-        /// </summary>
-        public bool ExtendedSessionsEnabled { get; set; } = true;
-
-        /// <summary>
         /// Method to get the next work item to process within supplied timeout
         /// </summary>
         /// <param name="receiveTimeout">The max timeout to wait</param>
@@ -129,7 +124,7 @@ namespace DurableTask.Core
 
             while (!isCompleted)
             {
-                if (this.ExtendedSessionsEnabled && newMessages == null && workItem.Session != null)
+                if (newMessages == null && workItem.Session != null)
                 {
                     bool keepFetching = true;
                     if (!isExtendedSession && fetchCount >= 1)
@@ -145,6 +140,11 @@ namespace DurableTask.Core
                         runtimeState.NewEvents.Clear();
                         fetchCount++;
                     }
+                }
+
+                if (newMessages == null)
+                {
+                    break;
                 }
 
                 var messagesToSend = new List<TaskMessage>();

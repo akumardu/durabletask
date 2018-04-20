@@ -97,6 +97,11 @@ namespace DurableTask.AzureStorage
         public int PartitionCount { get; set; } = DefaultPartitionCount;
 
         /// <summary>
+        /// Gets or sets a flag indicating whether to enable extended sessions.
+        /// </summary>
+        public bool ExtendedSessionsEnabled { get; set; }
+
+        /// <summary>
         /// Renew interval for all leases for partitions currently held.
         /// </summary>
         public TimeSpan LeaseRenewInterval { get; set; } = TimeSpan.FromSeconds(10);
