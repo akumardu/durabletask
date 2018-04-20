@@ -344,7 +344,7 @@ namespace DurableTask.AzureStorage.Tracking
             IList<HistoryEvent> newEvents = runtimeState.NewEvents;
             IList<HistoryEvent> allEvents = runtimeState.Events;
 
-                       var newEventListBuffer = new StringBuilder(4000);
+            var newEventListBuffer = new StringBuilder(4000);
             var historyEventBatch = new TableBatchOperation();
 
             EventType? orchestratorEventType = null;

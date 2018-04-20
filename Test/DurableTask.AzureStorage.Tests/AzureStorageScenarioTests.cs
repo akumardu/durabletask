@@ -15,6 +15,7 @@ namespace DurableTask.AzureStorage.Tests
 {
     using System;
     using System.Collections.Generic;
+    using System.Diagnostics;
     using System.IO;
     using System.Linq;
     using System.Runtime.Serialization;
@@ -43,7 +44,8 @@ namespace DurableTask.AzureStorage.Tests
                 await host.StartAsync();
 
                 var client = await host.StartOrchestrationAsync(typeof(Orchestrations.SayHelloInline), "World");
-                var status = await client.WaitForCompletionAsync(TimeSpan.FromSeconds(30));
+                var status = await client.WaitForCompletionAsync(
+                    Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(30));
 
                 Assert.AreEqual(OrchestrationStatus.Completed, status?.OrchestrationStatus);
                 Assert.AreEqual("World", JToken.Parse(status?.Input));
@@ -64,7 +66,8 @@ namespace DurableTask.AzureStorage.Tests
                 await host.StartAsync();
 
                 var client = await host.StartOrchestrationAsync(typeof(Orchestrations.SayHelloWithActivity), "World");
-                var status = await client.WaitForCompletionAsync(TimeSpan.FromSeconds(30));
+                var status = await client.WaitForCompletionAsync(
+                    Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(30));
 
                 Assert.AreEqual(OrchestrationStatus.Completed, status?.OrchestrationStatus);
                 Assert.AreEqual("World", JToken.Parse(status?.Input));
@@ -85,7 +88,8 @@ namespace DurableTask.AzureStorage.Tests
                 await host.StartAsync();
 
                 var client = await host.StartOrchestrationAsync(typeof(Orchestrations.Factorial), 10);
-                var status = await client.WaitForCompletionAsync(TimeSpan.FromSeconds(30));
+                var status = await client.WaitForCompletionAsync(
+                    Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(30));
 
                 Assert.AreEqual(OrchestrationStatus.Completed, status?.OrchestrationStatus);
                 Assert.AreEqual(10, JToken.Parse(status?.Input));
