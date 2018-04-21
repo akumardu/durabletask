@@ -59,6 +59,7 @@ namespace DurableTask.Core
             {
                 SynchronizationContext syncCtx = new TaskOrchestrationSynchronizationContext(decisionScheduler);
                 SynchronizationContext.SetSynchronizationContext(syncCtx);
+                OrchestrationContext.IsOrchestratorThread = true;
 
                 try
                 {
@@ -106,6 +107,7 @@ namespace DurableTask.Core
             {
                 orchestrationRuntimeState.Status = taskOrchestration.GetStatus();
                 SynchronizationContext.SetSynchronizationContext(prevCtx);
+                OrchestrationContext.IsOrchestratorThread = false;
             }
         }
 
